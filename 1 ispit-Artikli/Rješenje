@@ -230,6 +230,5 @@ void main() {
 	cigarete.Dealociraj();	cokolada.Dealociraj();	sok.Dealociraj();
 	
 	racun.Dealociraj();
-
 	system("pause>0");
 }
