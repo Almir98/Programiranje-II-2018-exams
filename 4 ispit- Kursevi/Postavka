@@ -125,4 +125,5 @@ void main() {
 
 	//izvrsiti potrebne dealokacije
 	system("pause");
+	
 }
