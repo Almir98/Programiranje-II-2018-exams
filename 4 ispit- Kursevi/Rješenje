@@ -1,0 +1,334 @@
+#include<iostream>
+using namespace std;
+const char *crt = "\n--------------------------------------------\n";
+
+enum enumKursevi { HtmlCSSJavaScript, SoftwareEngeneeringFundamentals, MasteringSQL, WindowsSecurity };
+const char* charenumKursevi[] = { "HtmlCSSJavaScript","SoftwareEngeneeringFundamentals", "MasteringSQL", "WindowsSecurity" };
+
+struct Datum {
+	int * _dan, *_mjesec, *_godina;
+	void Unos(int d, int m, int g) {
+		_dan = new int(d);
+		_mjesec = new int(m);
+		_godina = new int(g);
+	}
+	void Ispis() { cout << *_dan << "/" << *_mjesec << "/" << *_godina << endl; }
+	void Dealociraj() { delete _dan; delete _mjesec; delete _godina; }
+	
+	int SumaDatuma()
+	{
+		return *_dan + *_mjesec * 30 + *_godina * 365;
+	}
+};
+
+struct Kurs {
+	enumKursevi _kurs;
+	Datum _pocetak;
+	Datum _kraj;
+	char * _imePredavaca;
+	bool _aktivan;//SVAKI KURS JE NA POCETKU AKTIVAN
+
+	void Unos(enumKursevi kurs,Datum d,Datum dd, const char*ime)
+	{
+		_kurs = kurs;
+		int size = strlen(ime) + 1;
+		_imePredavaca = new char[size];
+		strcpy_s(_imePredavaca, size, ime);
+		_pocetak.Unos(*d._dan, *d._mjesec, *d._godina);
+		_kraj.Unos(*dd._dan, *dd._mjesec, *dd._godina);
+		_aktivan = true;
+	}
+
+	void Ispis()
+	{
+		cout << charenumKursevi[_kurs] << endl;
+		cout << _imePredavaca << endl;
+		_pocetak.Ispis();
+		_kraj.Ispis();
+
+	}
+
+	void Dealociraj() {
+		delete[] _imePredavaca; _imePredavaca = nullptr;
+	}
+};
+struct Polaznik {
+	int _polaznikID;
+	char * _imePrezime;
+	
+	void Unos(int polaznikID, const char * imePrezime) {
+		_polaznikID = polaznikID;
+		int size = strlen(imePrezime) + 1;
+		_imePrezime = new char[size];
+		strcpy_s(_imePrezime, size, imePrezime);
+	}
+	void Ispis() { cout << _polaznikID << " " << _imePrezime << endl; }
+	void Dealociraj() {
+		delete[] _imePrezime; _imePrezime = nullptr;
+	}
+};
+
+struct Polaganja {
+	Polaznik _polaznik;
+	Kurs _kurs;
+	Datum _datumPolaganja;
+	float _ostvareniUspjeh;
+
+	void Unos(Polaznik p, Kurs k, Datum d, float uspjeh)
+	{
+		_polaznik.Unos(p._polaznikID, p._imePrezime);
+		_kurs.Unos(k._kurs, k._pocetak, k._kraj, k._imePredavaca);
+		_datumPolaganja.Unos(*d._dan, *d._mjesec, *d._godina);
+		_ostvareniUspjeh = uspjeh;
+	}
+
+	void Ispis()
+	{
+		_polaznik.Ispis();
+		_kurs.Ispis();
+		_datumPolaganja.Ispis();
+		cout << "Ostvareni uspjeh " << _ostvareniUspjeh << endl;
+	}
+	void Dealociraj()
+	{
+		_polaznik.Dealociraj();
+		_kurs.Dealociraj();
+		_datumPolaganja.Dealociraj();
+	}
+
+};
+
+struct SkillsCentar {
+	char * _nazivCentra;
+	Kurs * _kursevi[50];//JEDAN EDUKACIJSKI CENTAR MOZE NUDITI NAJVISE 50 KURSEVA
+	int _trenutnoKurseva;
+	Polaganja * _polaganja;
+	int _trenutnoPolaganja;
+
+	void Unos(const char*naziv)
+	{
+		int size = strlen(naziv) + 1;
+		_nazivCentra = new char[size];
+		strcpy_s(_nazivCentra, size, naziv);
+		_trenutnoKurseva = 0;
+		_polaganja = nullptr;
+		_trenutnoPolaganja = 0;
+	}
+	
+	void Dealociraj()
+	{
+		delete[]_nazivCentra;	_nazivCentra = nullptr;
+
+		for (int i = 0; i < _trenutnoKurseva; i++)
+		{
+			_kursevi[i]->Dealociraj();	_kursevi[i] = nullptr;
+		}
+
+		for (int i = 0; i < _trenutnoPolaganja; i++)
+		{
+			_polaganja[i].Dealociraj();
+		}
+		delete[]_polaganja;	_polaganja = nullptr;
+	}
+	void Ispis()
+	{
+		cout << _nazivCentra << endl;
+		for (int i = 0; i < _trenutnoKurseva; i++)
+		{
+			_kursevi[i]->Ispis();
+		}
+		for (int i = 0; i < _trenutnoPolaganja; i++)
+		{
+			_polaganja[i].Ispis();
+		}
+	}
+	
+	//jedan edukacijski centar moze nuditi vise istih kurseva (npr. MasteringSQL), ali se oni moraju realizovati u razlictim periodima (pocetak-kraj) tj. ne smiju se preklapati
+	//novi kurs istog tipa (npr. MasteringSQL) se mora realizovati nakon prethodno dodanog npr. ako prethodni kurs MasteringSQL traje 01.03.2016 - 01.04.2016, onda
+	//se novi kurs MasteringSQL moze dodati jedino ako pocinje nakon 01.04.2016
+	
+	bool DodajKurs(Kurs k)
+	{
+		if (_trenutnoKurseva > 50)
+			return false;
+
+		for (int i = 0; i < _trenutnoKurseva; i++)
+		{
+			if (_kursevi[i]->_kurs == k._kurs)
+			{
+				if (_kursevi[i]->_kraj.SumaDatuma() > k._pocetak.SumaDatuma())
+					return false;
+			}
+		}
+		_kursevi[_trenutnoKurseva] = new Kurs;
+		_kursevi[_trenutnoKurseva]->Unos(k._kurs, k._pocetak, k._kraj, k._imePredavaca);
+		_trenutnoKurseva++;
+		return true;
+	}
+	
+	//nije moguce dodati polaganje onog kursa koji nije evidentiran (registrovan, ponudjen) u tom edukacijskom centru
+	//moguce je polagati samo aktivne kurseve i to najkasnije 5 dana od dana zavrsetka (kraja) posljednje dodanog (aktivnog) kursa iste vrste (npr. MasteringSQL)
+	//jedan polaznik moze vise puta polagati isti kurs, ali novi procenat mora biti veci od prethodno dodanog (na istom kursu)
+	
+	bool DodajPolaganje(Polaganja p)
+	{
+		bool postoji = false;
+
+		for (int i = 0; i < _trenutnoKurseva; i++)
+		{
+			if (_kursevi[i]->_kurs == p._kurs._kurs)
+				postoji = true;
+		}
+		if (!postoji)
+			return false;
+
+		if (p._kurs._aktivan == false)
+			return false;
+
+		for (int i = 0; i < _trenutnoKurseva; i++)
+		{
+			if (_kursevi[i]->_kurs == p._kurs._kurs && _kursevi[i]->_aktivan)
+			{
+				if(abs(_kursevi[i]->_kraj.SumaDatuma() - p._kurs._pocetak.SumaDatuma() ) >5 )
+				{
+					return false;
+				}
+			}
+		}
+
+		Polaganja*temp = new Polaganja[_trenutnoPolaganja + 1];
+		
+		for (int i = 0; i < _trenutnoPolaganja; i++)
+		{
+			temp[i].Unos(_polaganja[i]._polaznik, _polaganja[i]._kurs, _polaganja[i]._datumPolaganja, _polaganja[i]._ostvareniUspjeh);
+			_polaganja[i].Dealociraj();
+		}
+		if (_polaganja != nullptr)
+			delete[]_polaganja;
+
+		temp[_trenutnoPolaganja].Unos(p._polaznik, p._kurs, p._datumPolaganja, p._ostvareniUspjeh);
+		_polaganja = temp;
+		_trenutnoPolaganja++;
+		temp = nullptr;
+		return true;
+	}
+
+	Polaganja *PolaganjaByDatum(Datum OD, Datum DO, int &brojPolaganja)
+	{
+		Polaganja*temp = new Polaganja[brojPolaganja];
+
+		for (int i = 0; i < _trenutnoPolaganja; i++)
+		{
+			if (_polaganja[i]._datumPolaganja.SumaDatuma() >= OD.SumaDatuma() && _polaganja[i]._datumPolaganja.SumaDatuma() <= DO.SumaDatuma())
+			{
+				temp[i].Unos(_polaganja[i]._polaznik, _polaganja[i]._kurs, _polaganja[i]._datumPolaganja, _polaganja[i]._ostvareniUspjeh);
+				brojPolaganja++;
+			}
+		}
+		if (brojPolaganja == 0)
+			return nullptr;
+		else
+			return temp;
+	}
+
+	void Sortiraj()
+	{
+		for (int i = 0; i < _trenutnoKurseva-1; i++)
+		{
+			for (int j = i+1; j < _trenutnoKurseva; j++)
+			{
+				if (_kursevi[i]->_pocetak.SumaDatuma() < _kursevi[j]->_pocetak.SumaDatuma())
+					swap(_kursevi[i], _kursevi[j]);
+			}
+		}
+	}
+};
+
+//PretragaRekurzivno - rekurzivna funkcija pronalazi prosjecni uspjeh koji su polaznici tokom godine (npr.2016) ostvarili na odredjenom kursu (npr. MasteringSQL)
+int PretragaRekurzivno(SkillsCentar centar,int godina,enumKursevi kurs,int brojac=0,int suma=0,int br_akt=0)
+{
+	if (centar._trenutnoPolaganja == brojac)
+	{
+		if (br_akt == 0)
+			return 0;
+		return float(suma / br_akt);
+	}
+	if (*centar._polaganja[brojac]._datumPolaganja._godina == godina && centar._polaganja[brojac]._kurs._kurs == kurs)
+		return PretragaRekurzivno(centar, godina, kurs, brojac + 1, suma + centar._polaganja[brojac]._ostvareniUspjeh, br_akt + 1);
+	return PretragaRekurzivno(centar, godina, kurs, brojac + 1, suma, br_akt);
+}
+
+void main() {
+
+	Datum datum1, datum2, datum3, datum4, datum5, datum6;
+	datum1.Unos(26, 11, 2015);
+	datum2.Unos(29, 5, 2016);
+	datum3.Unos(5, 6, 2016);
+	datum4.Unos(15, 8, 2016);
+	datum5.Unos(13, 7, 2016);
+	datum6.Unos(22, 9, 2016);
+
+	Kurs softverski, html, sql, security;
+	softverski.Unos(SoftwareEngeneeringFundamentals, datum1, datum2, "Emina Junuz");
+	html.Unos(HtmlCSSJavaScript, datum2, datum3, "Larisa Tipura");
+	sql.Unos(MasteringSQL, datum3, datum4, "Jasmin Azemovic");
+	security.Unos(WindowsSecurity, datum3, datum4, "Adel Handzic");
+
+	Polaznik denis, zanin, indira;
+	denis.Unos(1, "Denis Music");
+	zanin.Unos(2, "Zanin Vejzovic");
+	indira.Unos(3, "Indira Hamulic");
+
+	Polaganja denisHtml, zaninHtml, indiraSql;
+	denisHtml.Unos(denis, html, datum5, 61);
+	//61 predstavlja ostvareni uspjeh/procenat, a uspjesno polozenim se smatra svaki kurs na kome je polaznik ostvari vise od 55%
+	zaninHtml.Unos(zanin, html, datum6, 93);
+
+	SkillsCentar mostar;
+	mostar.Unos("Skills Center Mostar");
+	//jedan edukacijski centar moze nuditi vise istih kurseva (npr. MasteringSQL), ali se oni moraju realizovati u razlictim periodima (pocetak-kraj) tj. ne smiju se 
+	//preklapati
+	//novi kurs istog tipa (npr. MasteringSQL) se mora realizovati nakon prethodno dodanog npr. ako prethodni kurs MasteringSQL traje 01.03.2016 - 01.04.2016, onda
+		//se novi kurs MasteringSQL moze dodati jedino ako pocinje nakon 01.04.2016
+	if (mostar.DodajKurs(softverski)) {
+		cout << crt << "KURS USPJESNO REGISTROVAN" << crt;
+		softverski.Ispis();
+		cout << crt;
+	}
+	//nije moguce dodati polaganje onog kursa koji nije evidentiran (registrovan, ponudjen) u tom edukacijskom centru
+	//moguce je polagati samo aktivne kurseve i to najkasnije 5 dana od dana zavrsetka (kraja) posljednje dodanog (aktivnog) kursa iste vrste (npr. MasteringSQL)
+	//jedan polaznik moze vise puta polagati isti kurs, ali novi procenat mora biti veci od prethodno dodanog (na istom kursu)
+	if (mostar.DodajPolaganje(denisHtml)) {
+		cout << crt << "POLAGANJE EVIDENTIRANO" << crt;
+		denisHtml.Ispis();
+	}
+	Datum OD, DO;
+	int brojPolaganja = 0;
+	OD.Unos(1, 6, 2016);
+	DO.Unos(1, 8, 2016);
+
+	//PolaganjaByDatum – vraca niz polaganja koja su uspjesno realizovana u periodu OD-DO
+	Polaganja * polaganjaByDatum = mostar.PolaganjaByDatum(OD, DO, brojPolaganja);
+	cout << "U periodu od ";
+	OD.Ispis();
+	cout << " do ";
+	DO.Ispis();
+	cout << " uspjesno je realizovano " << brojPolaganja << " polaganja--->>>";
+	for (size_t i = 0; i < brojPolaganja; i++)
+		polaganjaByDatum[i].Ispis();
+
+	//PretragaRekurzivno - rekurzivna funkcija pronalazi prosjecni uspjeh koji su polaznici tokom godine (npr.2016) ostvarili na odredjenom kursu (npr. MasteringSQL)
+	cout << "Prosjecan uspjeh na kursu MasteringSQL u 2016 godini je " << PretragaRekurzivno(mostar,2016,MasteringSQL) << endl;
+	//Ispis - ispisuje sve informacije o edukacijskom centru. prije ispisa sortirati sve kurseve na osnovu pocetka odrzavanja kursa
+	mostar.Sortiraj();
+	mostar.Ispis();
+
+	datum1.Dealociraj();	datum2.Dealociraj();	datum3.Dealociraj();	datum4.Dealociraj();	datum5.Dealociraj();	datum6.Dealociraj();
+	softverski.Dealociraj();	html.Dealociraj();	security.Dealociraj();	sql.Dealociraj();
+	denis.Dealociraj();	zanin.Dealociraj();	indira.Dealociraj();
+	denisHtml.Dealociraj();	zaninHtml.Dealociraj();
+	OD.Dealociraj();	DO.Dealociraj();
+	mostar.Dealociraj();
+
+	system("pause>0");
+}
