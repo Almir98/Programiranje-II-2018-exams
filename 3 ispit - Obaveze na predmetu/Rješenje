@@ -23,7 +23,6 @@ struct Datum {
 		return *_dan + *_mjesec * 30 + *_godina * 365;
 	}
 };
-
 struct ObavezeNaPredmetu {
 	VrstaObaveze * _vrstaObaveze;
 	Datum * _datumIzvrsenja;
