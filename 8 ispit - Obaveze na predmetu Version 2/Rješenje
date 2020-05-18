@@ -1,0 +1,430 @@
+#include<iostream>
+#include<fstream>
+using namespace std;
+
+enum VrstaObaveze { Seminarski, Parcijalni1, Parcijalni2, Integralni, Prakticni };
+const char *charVrstObav[] = { "Seminarski", "Parcijalni1", "Parcijalni2", "Integralni", "Prakticni" };	//za slovni ispisc enumeracije
+
+char *AlocirajNizKaraktera(const char* sadrzraj)
+{
+	if (sadrzraj == nullptr)
+		return nullptr;
+	int size = strlen(sadrzraj) + 1;
+	char*temp = new char[size];
+	strcpy_s(temp, size, sadrzraj);
+	return temp;
+}
+
+struct Datum {
+	int *_dan, *_mjesec, *_godina;
+	
+	void Unos(int d, int m, int g) {
+		_dan = new int(d); _mjesec = new int(m); _godina = new int(g);
+	}
+	
+	void Ispis() { cout << *_dan << "/" << *_mjesec << "/" << *_godina << endl; }
+	
+	void Dealociraj() {
+		delete _dan;	_dan = nullptr;
+		delete _mjesec;	_mjesec = nullptr;
+		delete _godina;	_godina = nullptr;
+	}
+	int SumaDatuma()
+	{
+		return *_dan + *_mjesec * 30 + *_godina * 365;
+	}
+};
+
+struct ObavezeNaPredmetu {
+	VrstaObaveze _vrstaObaveze;
+	Datum * _datumIzvrsenja;
+	char * _napomena;
+	int _ocjena; // 5 - 10 
+	
+	void Unos(VrstaObaveze vrsta, Datum * datum, int ocjena, const char * napomena) {
+		_vrstaObaveze = vrsta;
+		_datumIzvrsenja = new Datum;
+		_datumIzvrsenja->Unos(*datum->_dan, *datum->_mjesec, *datum->_godina);
+		_ocjena = ocjena;
+		_napomena = AlocirajNizKaraktera(napomena);
+	}
+	
+	void DodajNapomenu(const char *sadrzaj)
+	{
+		int size = strlen(_napomena) + strlen(sadrzaj) + 2;
+		char*temp = new char[size];
+		strcpy_s(temp, size, _napomena);
+		strcat_s(temp, size," ");
+		strcat_s(temp, size, sadrzaj);
+		
+		delete[]_napomena;
+		_napomena = temp;
+		temp = nullptr;
+	}
+
+	void Ispis() {
+		cout << charVrstObav[_vrstaObaveze] << "  " << _ocjena << "  " << _napomena << endl;
+		_datumIzvrsenja->Ispis();
+		cout << endl;
+	}
+	
+	void Dealociraj() {
+		_datumIzvrsenja->Dealociraj();
+		delete[] _datumIzvrsenja; _datumIzvrsenja = nullptr;
+		delete[] _napomena; _napomena = nullptr;
+	}
+};
+
+struct PolozeniPredmet {
+	char * _nazivPredmeta;
+	ObavezeNaPredmetu * _listaIzvrsenihObaveza[10];//ogranicen je broj izvrsenih obavezan na predmetu
+	int _trenutnoIzvrsenihObaveza;
+	int _konacnaOcjena; //formira se na osnovu ocjena izvrsenih obaveza
+	
+	void Unos(const char * naziv) {
+		_nazivPredmeta = AlocirajNizKaraktera(naziv);
+		_trenutnoIzvrsenihObaveza = 0;
+		_konacnaOcjena = 5;
+	}
+	
+	void Kopiraj(PolozeniPredmet &p)
+	{
+		for (int i = 0; i < p._trenutnoIzvrsenihObaveza; i++)
+		{
+			_listaIzvrsenihObaveza[i] = new ObavezeNaPredmetu;
+			_listaIzvrsenihObaveza[i]->Unos(p._listaIzvrsenihObaveza[i]->_vrstaObaveze, p._listaIzvrsenihObaveza[i]->_datumIzvrsenja, p._listaIzvrsenihObaveza[i]->_ocjena, p._listaIzvrsenihObaveza[i]->_napomena);
+		}
+		if (p.FormirajKonacnuOcjenu() > 5)
+			_konacnaOcjena = p.FormirajKonacnuOcjenu();
+		else
+			_konacnaOcjena = 5;
+	}
+
+	void Dealociraj() {
+		delete[] _nazivPredmeta; _nazivPredmeta = nullptr;
+		for (size_t i = 0; i < _trenutnoIzvrsenihObaveza; i++) {
+			_listaIzvrsenihObaveza[i]->Dealociraj();
+			delete _listaIzvrsenihObaveza[i];
+			_listaIzvrsenihObaveza[i] = nullptr;
+		}
+	}
+	
+	void Ispis() {
+		cout << _nazivPredmeta << "(" << _konacnaOcjena << ")" << endl;
+		for (size_t i = 0; i < _trenutnoIzvrsenihObaveza; i++)
+			_listaIzvrsenihObaveza[i]->Ispis();
+	}
+
+	bool DodajIzvrsenuObavezu(ObavezeNaPredmetu obaveza)
+	{
+		if (_trenutnoIzvrsenihObaveza > 10)
+			return false;
+
+		for (int i = 0; i < _trenutnoIzvrsenihObaveza; i++)
+		{
+			if (_listaIzvrsenihObaveza[i]->_vrstaObaveze == obaveza._vrstaObaveze)
+			{
+				if (_listaIzvrsenihObaveza[i]->_vrstaObaveze != Seminarski && _listaIzvrsenihObaveza[i]->_ocjena != 5)
+					return false;
+			}
+		}
+		_listaIzvrsenihObaveza[_trenutnoIzvrsenihObaveza] = new ObavezeNaPredmetu;
+		_listaIzvrsenihObaveza[_trenutnoIzvrsenihObaveza]->Unos(obaveza._vrstaObaveze, obaveza._datumIzvrsenja, obaveza._ocjena, obaveza._napomena);
+		_trenutnoIzvrsenihObaveza++;
+		return true;
+	}
+
+	/*
+	1. DodajIzvrsenuObavezu – na osnovu vrijednosti primljenog parametra osigurati dodavanje novoizvrsene obaveze na predmetu. Potrebno je onemoguciti dodavanje
+	identicnih obaveza. Identicna vrsta obaveze se moze dodati samo u slucaju da se radi o Prakticno radu ili je prethodno dodana obaveza (identicne vrste) imala
+	ocjenu 5.
+
+	2. FormirajKonacnuOcjenu - formiranje konacne ocjene se vrsi prema sljedecim pravilima: student mora posjedovati polozen integralni ili dva parijcalna ispita; ukoliko
+	je ispit polozen putem parcijalnih ispita, student takodjer mora imati pozitivno (ocjenom vecom od 5) ocijenjena najmanje dva seminarska rada u okviru kojih nije 
+	evidentirana losa napomena (rijeci koje oznacavaju losu napomenu: nije dobro, kopirano, nije ispravljeno); u slucaju da je ispit polozen putem integralnog ispita
+	student mora imati polozen i prakticni ispit (polozen najkasnije 15 dana od dana polaganja integralnog ispita).
+	*/
+
+	int FormirajKonacnuOcjenu()
+	{
+		bool imaPrvi = false;
+		bool imaDrugi = false;
+		bool imaIntegralni = false;
+		bool imaPrakticni = false;
+		bool vicemo = true;
+
+		int suma = 0, brojac = 0, validnih = 0;
+
+		for (int i = 0; i < _trenutnoIzvrsenihObaveza; i++)
+		{
+			if (_listaIzvrsenihObaveza[i]->_vrstaObaveze == Parcijalni1 && _listaIzvrsenihObaveza[i]->_ocjena > 5)
+				imaPrvi = true;
+
+			if (_listaIzvrsenihObaveza[i]->_vrstaObaveze == Parcijalni2 && _listaIzvrsenihObaveza[i]->_ocjena > 5)
+				imaDrugi = true;
+
+			if (_listaIzvrsenihObaveza[i]->_vrstaObaveze == Seminarski && _listaIzvrsenihObaveza[i]->_ocjena > 5 &&
+				strstr(_listaIzvrsenihObaveza[i]->_napomena, "nije dobro") == nullptr &&
+				strstr(_listaIzvrsenihObaveza[i]->_napomena, "kopirano") == nullptr &&
+				strstr(_listaIzvrsenihObaveza[i]->_napomena, "nije ispravljeno") == nullptr)
+			{
+				validnih++;
+			}
+		}
+
+		if (imaPrvi && imaDrugi && validnih >= 2)
+		{
+			for (int i = 0; i < _trenutnoIzvrsenihObaveza; i++)
+			{
+				if (_listaIzvrsenihObaveza[i]->_ocjena > 5)
+				{
+					suma = suma + _listaIzvrsenihObaveza[i]->_ocjena;
+					brojac++;
+				}
+			}
+			suma = suma / brojac;
+			_konacnaOcjena = suma;
+			return _konacnaOcjena;
+		}
+
+		int indeks = 0;
+
+		for (int i = 0; i < _trenutnoIzvrsenihObaveza; i++)
+		{
+			if (_listaIzvrsenihObaveza[i]->_vrstaObaveze == Integralni && _listaIzvrsenihObaveza[i]->_ocjena > 5)
+			{
+				imaIntegralni = true;
+				indeks = i;
+			}
+
+			if (imaIntegralni)
+			{
+				if (_listaIzvrsenihObaveza[i]->_vrstaObaveze == Prakticni && _listaIzvrsenihObaveza[i]->_ocjena > 5)
+					imaPrakticni = true;
+
+				if (imaPrakticni)
+				{
+					if (abs(_listaIzvrsenihObaveza[indeks]->_datumIzvrsenja->SumaDatuma() - _listaIzvrsenihObaveza[i]->_datumIzvrsenja->SumaDatuma()) > 15)
+						vicemo = false;
+				}
+			}
+		}
+
+		if (vicemo)
+		{
+			for (int i = 0; i < _trenutnoIzvrsenihObaveza; i++)
+			{
+				if (_listaIzvrsenihObaveza[i]->_ocjena > 5)
+				{
+					suma = suma + _listaIzvrsenihObaveza[i]->_ocjena;
+					brojac++;
+				}
+			}
+			suma = suma / brojac;
+			_konacnaOcjena = suma;
+			return _konacnaOcjena;
+		}
+
+		_konacnaOcjena = 5;
+		return _konacnaOcjena;
+	}
+
+};
+
+struct Student {
+	char * _imePrezime;
+	char * _brojIndeksa;
+	PolozeniPredmet * _polozeniPredmeti;
+	int _brojPolozenih;
+	
+	void Unos(const char * IB,const char * imePrezime) {
+		_imePrezime = AlocirajNizKaraktera(imePrezime);
+		_brojIndeksa = AlocirajNizKaraktera(IB);
+		_polozeniPredmeti = nullptr;
+		_brojPolozenih = 0;
+	}
+
+	void Ispis()
+	{
+		cout << _imePrezime << "   " << _brojIndeksa;
+		for (int i = 0; i < _brojPolozenih; i++)
+			_polozeniPredmeti[i].Ispis();
+	}
+
+	void Dealociraj()
+	{
+		delete[]_imePrezime;	_imePrezime = nullptr;
+		delete[]_brojIndeksa;	_brojIndeksa = nullptr;
+		for (int i = 0; i < _brojPolozenih; i++)
+			_polozeniPredmeti[i].Dealociraj();
+		
+		if(_polozeniPredmeti!=nullptr)
+		delete[]_polozeniPredmeti;
+		_polozeniPredmeti = nullptr;
+	}
+
+	bool DodajPolozeniPredmet(PolozeniPredmet predmet)
+	{
+		if (predmet.FormirajKonacnuOcjenu() == 5)
+			return false;
+
+		for (int i = 0; i < _brojPolozenih; i++)
+		{
+			if (strcmp(_polozeniPredmeti[i]._nazivPredmeta, predmet._nazivPredmeta) == 0)
+				return false;
+
+			for (int j = 0; j < _polozeniPredmeti[i]._trenutnoIzvrsenihObaveza; j++)
+			{
+				if (strstr(_polozeniPredmeti[i]._listaIzvrsenihObaveza[j]->_napomena, "prepisivao") != nullptr ||
+					strstr(_polozeniPredmeti[i]._listaIzvrsenihObaveza[j]->_napomena, "izbacen") != nullptr)
+				{
+					return false;
+				}
+			}
+		}
+
+		PolozeniPredmet *temp = new PolozeniPredmet[_brojPolozenih + 1];
+		for (int i = 0; i < _brojPolozenih; i++)
+		{
+			temp[i].Unos(_polozeniPredmeti[i]._nazivPredmeta);
+			temp[i].Kopiraj(predmet);
+			_polozeniPredmeti[i].Dealociraj();
+		}
+		if (_polozeniPredmeti != nullptr)
+			delete[]_polozeniPredmeti;
+
+		temp[_brojPolozenih].Unos(predmet._nazivPredmeta);
+		temp[_brojPolozenih].Kopiraj(predmet);
+
+		_polozeniPredmeti = temp;
+		_brojPolozenih++;
+		return true;
+	}
+
+	/*
+	1. DodajPolozeniPredmet - na osnovu vrijednosti primljenog parametra osigurati dodavanje novopolozenog predmeta. Potrebno je onemoguciti dodavanje
+	identicnih predmeta, predmeta koja ne posjeduju formiranu konacnu ocjenu, te predmeta kod kojih je u napomeni neke od izvrsenih obaveza navedena rijec
+	'prepisivao' ili 'izbacen'.
+	
+	2. PronadjiNajuspjesnijuObavezu - vraca pokazivac na predmet u okviru koga je student ostvario najvecu ocjenu tokom realizacije odredjene obaveze (vrsta 
+	obaveze je proslijedjena kao parametar). Ukoliko postoje dva identicna predmeta, onda funkcija vraca pokazivac na posljednje pronadjeni predmet. U slucaju da
+	obaveza nije pronadjena, funkcija vraca nullptr.
+	*/
+	
+	PolozeniPredmet * PronadjiNajuspjesnijuObavezu(VrstaObaveze v)
+	{
+		PolozeniPredmet*temp = nullptr;
+		int najv = 0;
+
+		for (int i = 0; i < _brojPolozenih; i++)
+		{
+			for (int j = 0; j < _polozeniPredmeti[i]._trenutnoIzvrsenihObaveza; j++)
+			{
+				if (_polozeniPredmeti[i]._listaIzvrsenihObaveza[j]->_vrstaObaveze == v)
+				{
+					if (_polozeniPredmeti[i]._listaIzvrsenihObaveza[j]->_ocjena > najv)
+					{
+						najv = _polozeniPredmeti[i]._listaIzvrsenihObaveza[j]->_ocjena;
+						temp = &_polozeniPredmeti[i];
+					}
+				}
+			}
+		}
+		return temp;
+	}
+};
+
+void UpisiUBinarniFajl(PolozeniPredmet &p)
+{
+	char ocjena[3];
+	_itoa_s(p._konacnaOcjena, ocjena, 10);
+	int size = strlen(p._nazivPredmeta) + strlen(ocjena)+3;
+	char*temp = new char[size];
+	
+	strcpy_s(temp, size, p._nazivPredmeta);
+	strcat_s(temp, size, "_");
+	strcat_s(temp, size, ocjena);
+
+	ofstream upis;
+	upis.open(temp, ios::binary);
+	upis.write((char*)(&p), sizeof(p));
+	upis.close();
+}
+
+/*
+1. UpisiUBinarniFajl - objekat koji je primljen kao parametar upisuje u binarni fajl. Naziv fajla treba biti sastavljen od naziva predmeta i konacne ocjena npr. 
+"Programiranje II_6"
+2. UcitajIzBinarnogFajla - u objekat koji je primljen kao parametar ucitava sadrzaj binarnog fajla (naziv fajla je takodjer proslijedjen kao parametar)
+*/
+
+void UcitajIzBinarnogFajla(PolozeniPredmet &p, const char*naziv)
+{
+	ifstream ispis;
+	ispis.open(naziv, ios::binary);
+	ispis.read((char*)(&p), sizeof(p));
+	ispis.close();
+}
+
+void main() {
+
+	Datum datumSeminarski1, datumSeminarski2, datumParcijalni1, datumParcijalni2,
+		datumIntegralni;
+	datumSeminarski1.Unos(10, 6, 2016);
+	datumSeminarski2.Unos(18, 6, 2016);
+	datumParcijalni1.Unos(22, 3, 2016);
+	datumParcijalni2.Unos(22, 6, 2016);
+
+	ObavezeNaPredmetu parcijalni1, parcijalni2, seminarski1, seminarski2;
+	parcijalni1.Unos(Parcijalni1, &datumParcijalni1, 6, "uslovno polozen");
+	parcijalni2.Unos(Parcijalni2, &datumParcijalni2, 5, "previse gresaka");
+	parcijalni2.DodajNapomenu("sugerisati da se vise paznje obrati na rad sa dinamickim nizovima");
+	seminarski1.Unos(Seminarski, &datumSeminarski1, 8, "implementirani svi algoritmi");
+	seminarski1.DodajNapomenu("predloziti ucesce na FITCC 2017");//omogucava dodavanje dodatnih napomena vezano za obeveze na predmetu
+	seminarski2.Unos(Seminarski, &datumSeminarski2, 6, "rad slican kao kod studenta IB150388");
+
+	//polozeni predmet
+	PolozeniPredmet prII, prII_FromFile;
+	prII.Unos("Programiranje II");
+	if (prII.DodajIzvrsenuObavezu(parcijalni1))
+		cout << "Parcijalni 1...dodan" << endl;
+	if (prII.DodajIzvrsenuObavezu(parcijalni2))
+		cout << "Parcijalni 2...dodan" << endl;
+	if (prII.DodajIzvrsenuObavezu(seminarski1))
+		cout << "Seminarski1...dodan" << endl;
+	if (prII.DodajIzvrsenuObavezu(seminarski2))
+		cout << "Seminarski2...dodan" << endl;
+
+
+	datumParcijalni2.Unos(22, 7, 2016);
+	//parcijalni2._datumIzvrsenja = &datumParcijalni2;
+
+	parcijalni2._datumIzvrsenja->Dealociraj();
+	parcijalni2._datumIzvrsenja->Unos(*datumParcijalni2._dan, *datumParcijalni2._mjesec, *datumParcijalni2._godina);
+	parcijalni2._ocjena = 6;
+
+	if (prII.DodajIzvrsenuObavezu(parcijalni2))
+		cout << "Parcijalni 2...dodan" << endl;
+	cout << "Konacna ocjena iz predmeta PRII je: " << prII.FormirajKonacnuOcjenu() << endl;
+
+	//manipulacija fajlovima
+	UpisiUBinarniFajl(prII);
+	prII.Ispis();
+	
+	UcitajIzBinarnogFajla(prII_FromFile, "Programiranje II_6");
+	prII_FromFile.Ispis();
+
+	Student jasmin;
+	jasmin.Unos("IB130031", "Jasmin Azemovic");
+	if (jasmin.DodajPolozeniPredmet(prII))
+		cout << "PRII uspjesno dodan!" << endl;
+	PolozeniPredmet * p = jasmin.PronadjiNajuspjesnijuObavezu(Seminarski);
+	cout << "Najuspjesniji seminarski je realizovan u okviru predmeta ";
+	if(p!=nullptr)
+	p->Ispis();
+	jasmin.Ispis();
+
+	//izvrsiti potrebne dealokacije
+
+	system("pause>0");
+}
+
