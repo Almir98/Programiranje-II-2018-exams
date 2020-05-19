@@ -1,0 +1,402 @@
+#include <iostream>
+#include <fstream>
+using namespace std;
+/*
+u nastavku je prikazan primjer ispitnog zapisnika (izvještaj o održanom ispitu) sa detaljima/stavkama
+Datum ispita: 07.09.2017
+Predmet: Programiranje II
+IZVJESTAJ O ODRZANOM ISPITU
+Br indeksa Ime prezime Komisijsko*** Ocjena
+16001	A. Joldic	DA	5
+15251	D. Music	NE	7 Ponisteno
+16014	E. Babovic	DA	8
+UKUPNO POLOZILO:	2
+PROSJECNA OCJENA:	6.67
+*** komisijski ispit: ako student pristupa èetvrti put i dalje (raèunajuæi i poništene rezultate)
+*/
+const char * crt = "\n-------------------------------------------\n";
+
+struct Datum {
+	int _dan;
+	int _mjesec;
+	int _godina;
+	
+	void Unos(int d, int m, int g) {
+		_dan = d;
+		_mjesec = m;
+		_godina = g;
+	}
+	
+	void Ispis() {
+		cout << _dan << "." << _mjesec << "." << _godina << " ";
+	}
+	char *GetDatumKaoNizKaraktera()
+	{
+		char dan[3], mjesec[3], godina[5];
+		_itoa_s(_dan, dan, 3, 10);
+		_itoa_s(_mjesec, mjesec, 10);
+		_itoa_s(_godina, godina, 10);
+		char *datum = new char[11];
+		strcpy_s(datum, 11, dan);
+		strcat_s(datum, 11, "-");
+		strcat_s(datum, 11, mjesec);
+		strcat_s(datum, 11, "-");
+		strcat_s(datum, 11, godina);
+		return datum;
+	}
+};
+
+struct Student {
+	char _imePrezime[20];
+	int _brojIndeksa;
+	int _polozioECTS;
+
+	void Unos(const char* naziv, int brindeks) {
+		strcpy_s(_imePrezime, naziv);
+		_brojIndeksa = brindeks;
+		_polozioECTS = 0;
+	}
+	void DodajECTS(float ects) {
+		_polozioECTS += ects;
+	}
+	void UmanjiECTS(float ects) {
+		_polozioECTS -= ects;
+	}
+	void Ispis() {
+		cout << _imePrezime << ", Indeks: " << _brojIndeksa << ", ECTS: " << _polozioECTS << " " << endl;
+	}
+};
+
+struct ZapisnikStavka {
+	int _ocjena;
+	Student* _student; //ZapisnikStavka æe pokazivati na objekat tipa student koji se nalazi u instanci tipa Fakultet, pa nije potrebno vršiti nove alokacije
+	bool _ponisteno;
+	bool _komisijskoPolaganje;
+
+	void Unos(Student* student, int ocjena, bool komisijskoPolaganje) {
+		_ocjena = ocjena;
+		_student = student;
+		_komisijskoPolaganje = komisijskoPolaganje;
+		_ponisteno = false;
+	}
+
+	void Ispis() {
+		cout << _student->_imePrezime << "\t" << _ocjena << "\t" << _student->_brojIndeksa << "\t";
+		if (_ponisteno)
+			cout << " Ponisteno";
+		cout << endl;
+	}
+};
+
+struct IspitniZapisnik {
+	Datum _datum;
+	ZapisnikStavka ** _stavke;//svaki put se dodaje po jedna stavka
+	int _brojStavki;
+	int _ects;
+	char _predmet[20];
+	
+	void Unos(Datum datum,const char* predmet, int ects) {
+		_datum.Unos(datum._dan, datum._mjesec, datum._godina);
+
+		_brojStavki = 0;
+		_stavke = nullptr;
+		_ects = ects;
+		strcpy_s(_predmet, predmet);
+	}
+	
+	void DodajStavku(Student *student, int ocjena, bool komisijsko)
+	{
+		ZapisnikStavka **temp = new ZapisnikStavka*[_brojStavki + 1];
+		
+		for (int i = 0; i < _brojStavki; i++)
+		{
+			temp[i] = new ZapisnikStavka;
+			temp[i]->Unos(_stavke[i]->_student, _stavke[i]->_ocjena, _stavke[i]->_komisijskoPolaganje);
+			delete[]_stavke[i];
+		}
+		if (_stavke != nullptr)
+			delete[]_stavke;
+
+		temp[_brojStavki] = new ZapisnikStavka;
+		temp[_brojStavki]->Unos(student, ocjena, komisijsko);
+		_stavke = temp;
+		_brojStavki++;
+	}
+
+
+	/*Prosjecnu ocjenu izraèunati koristeæi lambda funkciju koja se poziva koristeæi objekat
+	tipa auto. u prosjek raèunati i poništene rezultate (stavke)*/
+	
+	float GetProsjecnaOcjena() {
+		return 0;
+	}
+};
+
+const int Max = 100;
+
+/*unutar objekta tipa Fakultet ce se cuvati podaci o svim studentima i ispitnim zapisnicima, a dodaju se pomocu globalnih funkcija*/
+
+struct Fakultet {
+	//umjesto brojaca koristiti default.ne vrijednosti
+	Student* Studenti[Max] = { NULL };
+	IspitniZapisnik* Zapisnici[Max] = { NULL };
+
+	void Dealociraj() {
+		for (size_t i = 0; i < Max; i++) {
+			delete Studenti[i]; Studenti[i] = NULL;
+		}
+		for (size_t i = 0; i < Max; i++) {
+			delete Zapisnici[i]; Zapisnici[i] = NULL;
+		}
+	}
+
+
+};
+
+void dodaj_student(Fakultet &fakultet, const char*ime, int brindeksa)
+{
+	for (int i = 0; i < Max; i++)
+	{
+		if (fakultet.Studenti[i] != nullptr)
+		{
+			if (fakultet.Studenti[i]->_brojIndeksa == brindeksa)
+				return;
+		}
+
+		if (fakultet.Studenti[i] == nullptr)
+		{
+			fakultet.Studenti[i] = new Student;
+			fakultet.Studenti[i]->Unos(ime, brindeksa);
+			return;
+		}
+	}
+}
+
+void kreiraj_zapisnik(Fakultet &fakultet, int dan, int mjesec, int godina, const char*naziv, int ects)
+{
+	Datum temp;
+	temp.Unos(dan, mjesec, godina);
+
+	for (int i = 0; i < Max; i++)
+	{
+		if (fakultet.Zapisnici[i] == nullptr)
+		{
+			fakultet.Zapisnici[i] = new IspitniZapisnik;
+			fakultet.Zapisnici[i]->Unos(temp, naziv, ects);
+			return;
+		}
+	}
+}
+
+/*dodaje stavku na posljednji kreiran zapisnik, a ects studenta uveæa ako je student položio ispit. */
+	/*ako je student vec dodat u zapisnik, onda se vrsi samo modifikacija njegove ocjene*/
+
+bool dodaj_stavku_na_zapisnik(Fakultet &fakultet, int indeks, int ocjena)
+{
+	Student *nadjen = nullptr;
+
+	for (int i = 0; i < Max; i++)
+	{
+		if (fakultet.Studenti[i] != nullptr)
+		{
+			if (fakultet.Studenti[i]->_brojIndeksa == indeks)
+			{
+				nadjen = fakultet.Studenti[i];
+			}
+		}
+	}
+
+	for (int i = Max - 1; i >= 0; i--)
+	{
+		if (fakultet.Zapisnici[i] != nullptr && nadjen != nullptr)
+		{
+			for (int j = 0; j < fakultet.Zapisnici[i]->_brojStavki; j++)
+			{
+				if (fakultet.Zapisnici[i]->_stavke[j]->_student->_brojIndeksa == indeks)
+				{
+					fakultet.Zapisnici[i]->_stavke[j]->_ocjena = ocjena;
+					if (ocjena > 5)
+						nadjen->DodajECTS(fakultet.Zapisnici[i]->_ects);
+					return false;
+				}
+			}
+			fakultet.Zapisnici[i]->DodajStavku(nadjen, ocjena, false);
+			if (ocjena > 5)
+				nadjen->DodajECTS(fakultet.Zapisnici[i]->_ects);
+			return true;
+		}
+	}
+	return false;
+}
+/*u posljednjem zapisniku stavku za studenta 16001 ponistiti, a studentu umanjiti ects bodove.
+	funkcija vraca false u slucaju da se student ne nalazi na posljednjem zapisniku*/
+
+bool ponisti_stavku_rezultat(Fakultet &fakultet, int indeks)
+{
+	for (int i = Max - 1; i >= 0; i--)
+	{
+		if (fakultet.Zapisnici[i] != nullptr)
+		{
+			for (int j = 0; j < fakultet.Zapisnici[i]->_brojStavki; j++)
+			{
+				if (fakultet.Zapisnici[i]->_stavke[j]->_student->_brojIndeksa == indeks)
+				{
+					fakultet.Zapisnici[i]->_stavke[j]->_ponisteno = true;
+					fakultet.Zapisnici[i]->_stavke[j]->_student->UmanjiECTS(fakultet.Zapisnici[i]->_ects);
+					return true;
+				}
+			}
+		}
+	}
+}
+
+/* funkcija printaj prikazuje posljednji ispitni zapisnik u formatu prikazanom na pocetku zadatka.
+	* pored prikazivanja, identican sadrzaj ispitnog zapisnika je potrebno je pasiti u tekstualni fajl.
+	* naziv fajla treba biti Predmet_datum.txt, npr. ProgramiranjeII_2017-09-01.txt. zapisnik se nece
+	prikazati niti sacuvati u fajl ukoliko ne posjeduje niti jednu stavku ili su sve stavke ponistene*/
+
+	/*
+	u nastavku je prikazan primjer ispitnog zapisnika (izvještaj o održanom ispitu) sa detaljima/stavkama
+	Datum ispita: 07.09.2017
+	Predmet: Programiranje II
+	IZVJESTAJ O ODRZANOM ISPITU
+	Br indeksa Ime prezime Komisijsko*** Ocjena
+	16001	A. Joldic	DA	5
+	15251	D. Music	NE	7 Ponisteno
+	16014	E. Babovic	DA	8
+	UKUPNO POLOZILO:	2
+	PROSJECNA OCJENA:	6.67
+	*** komisijski ispit: ako student pristupa èetvrti put i dalje (raèunajuæi i poništene rezultate)
+	*/
+
+bool printaj(Fakultet &fakultet)
+{
+	ofstream upis;
+	char*temp;
+	int size = 0;
+
+	for (int i = Max - 1; i >= 0; i--)
+	{
+		if (fakultet.Zapisnici[i] != nullptr)
+		{
+			if (fakultet.Zapisnici[i]->_brojStavki == 0)
+				return false;
+		
+			int polozilo = 0;
+			for (int j = 0; j < fakultet.Zapisnici[i]->_brojStavki; j++)
+			{
+				if (fakultet.Zapisnici[i]->_stavke[j]->_ocjena > 5)
+					polozilo++;
+			}
+
+			size = strlen(fakultet.Zapisnici[i]->_predmet) + strlen(fakultet.Zapisnici[i]->_datum.GetDatumKaoNizKaraktera()) + strlen(".txt") + 2;
+			temp = new char[size];
+
+			strcpy_s(temp, size, fakultet.Zapisnici[i]->_predmet);
+			strcat_s(temp, size, "_");
+			strcat_s(temp, size, fakultet.Zapisnici[i]->_datum.GetDatumKaoNizKaraktera());
+			strcat_s(temp, size, ".txt");
+
+			upis.open(temp, ios::ate);
+
+			cout << "Datum ispita: " << fakultet.Zapisnici[i]->_datum.GetDatumKaoNizKaraktera() << endl;
+			upis << "Datum ispita: " << fakultet.Zapisnici[i]->_datum.GetDatumKaoNizKaraktera() << endl;
+			cout << "Predmet: " << fakultet.Zapisnici[i]->_predmet << endl;
+			upis << "Predmet: " << fakultet.Zapisnici[i]->_predmet << endl;
+			cout << "IZVJESTAJ O ODRZANOM ISPITU" << endl;
+			upis << "IZVJESTAJ O ODRZANOM ISPITU" << endl;
+			cout << "IZVJESTAJ O ODRZANOM ISPITU \n  Br indeksa \t Ime prezime \t Komisijsko*** \t Ocjena" << endl;
+			upis << "IZVJESTAJ O ODRZANOM ISPITU \n Br indeksa \t Ime prezime \t Komisijsko*** \t Ocjena" << endl;
+
+			for (size_t j = 0; j < fakultet.Zapisnici[i]->_brojStavki; j++)
+			{
+				cout << "\t" << fakultet.Zapisnici[i]->_stavke[j]->_student->_brojIndeksa << "\t" << fakultet.Zapisnici[i]->_stavke[j]->_student->_imePrezime << "\t";
+				upis << "\t" << fakultet.Zapisnici[i]->_stavke[j]->_student->_brojIndeksa << "\t" << fakultet.Zapisnici[i]->_stavke[j]->_student->_imePrezime << "\t";
+				if (fakultet.Zapisnici[i]->_stavke[j]->_komisijskoPolaganje)
+				{
+					cout << "DA";
+					upis << "DA";
+				}
+				else
+				{
+					cout << "NE";
+					upis << "NE";
+				}
+				cout << "\t" << fakultet.Zapisnici[i]->_stavke[j]->_ocjena;
+				upis << "\t" << fakultet.Zapisnici[i]->_stavke[j]->_ocjena;
+				if (fakultet.Zapisnici[i]->_stavke[j]->_ponisteno)
+				{
+					cout << "Ponisteno" << endl;
+					upis << "Ponisteno" << endl;
+				}
+				else
+				{
+					cout << endl;
+					upis << endl;
+				}
+			}
+			cout << "UKUPNO POLOZILO:" << "\t" << polozilo << endl;
+			upis << "UKUPNO POLOZILO:" << "\t" << polozilo << endl;
+			cout << "PROSJECNA OCJENA:" << "\t" << fakultet.Zapisnici[i]->GetProsjecnaOcjena() << endl;
+			upis << "PROSJECNA OCJENA:" << "\t" << fakultet.Zapisnici[i]->GetProsjecnaOcjena() << endl;
+			upis.close();
+			delete[]temp;
+			temp = nullptr;
+			return true;
+		}
+	}
+	return false;
+}
+
+void main() {
+	Fakultet fakultet;
+
+	/*dodaje podatke o novom studentu u fakultet */
+	//fakultet, imePrezime, broj indeksa
+	dodaj_student(fakultet, "A. Joldic", 16001);
+	dodaj_student(fakultet, "D. Music", 15251);
+	dodaj_student(fakultet, "E. Babovic	", 16014);
+	dodaj_student(fakultet, "E. Junuz", 16015);
+	dodaj_student(fakultet, "J. Azemovic", 16014);//ne dodaje studenta jer je broj indeksa zauzet
+												  /*kraira novi zapisnik*/
+												  //fakultet, datum, predmet, ects krediti
+	kreiraj_zapisnik(fakultet, 6, 9, 2017, "Programiranje 2", 7);
+
+	/*dodaje stavku na posljednji kreiran zapisnik, a ects studenta uveæa ako je student položio ispit. */
+
+	if (dodaj_stavku_na_zapisnik(fakultet, 16001, 5))
+		cout << "Stavka (rezultat) uspjesno dodata!" << endl;
+
+	/*ako je student vec dodat u zapisnik, onda se vrsi samo modifikacija njegove ocjene*/
+	if (!dodaj_stavku_na_zapisnik(fakultet, 16001, 6))
+		cout << "Student vec dodat na zapisnik. Ocjena je ispravljena!" << endl;
+
+	dodaj_stavku_na_zapisnik(fakultet, 15251, 5);
+	dodaj_stavku_na_zapisnik(fakultet, 16015, 6);
+	dodaj_stavku_na_zapisnik(fakultet, 16014, 8);
+
+	kreiraj_zapisnik(fakultet, 7, 9, 2017, "Raèunarske mreze", 5);
+	//naredne stavke se dodaju na novi zapisnik
+	dodaj_stavku_na_zapisnik(fakultet, 16015, 5);
+	dodaj_stavku_na_zapisnik(fakultet, 16014, 10);
+
+
+	/*u posljednjem zapisniku stavku za studenta 16001 ponistiti, a studentu umanjiti ects bodove.
+	funkcija vraca false u slucaju da se student ne nalazi na posljednjem zapisniku*/
+
+	if (ponisti_stavku_rezultat(fakultet, 16001))
+		cout << "Stavka (rezultat) uspjesno ponisten!" << endl;
+
+	if (!ponisti_stavku_rezultat(fakultet, 19001))
+		cout << "Student nije pronadjen!" << endl;
+
+	/* funkcija printaj prikazuje posljednji ispitni zapisnik u formatu prikazanom na pocetku zadatka.
+	* pored prikazivanja, identican sadrzaj ispitnog zapisnika je potrebno je pasiti u tekstualni fajl.
+	* naziv fajla treba biti Predmet_datum.txt, npr. ProgramiranjeII_2017-09-01.txt. zapisnik se nece
+	prikazati niti sacuvati u fajl ukoliko ne posjeduje niti jednu stavku ili su sve stavke ponistene*/
+	if (printaj(fakultet))
+		cout << "Ispitni zapisnik uspjesno prikazan i spasen u fajl!" << endl;
+	fakultet.Dealociraj();
+
+	system("pause>0");
+}
